@@ -217,6 +217,34 @@ class TestMultiJudge:
         assert (st["prompt_tokens"], st["completion_tokens"]) == (120, 50)
         assert st["decode_s"] == pytest.approx(2.0)
         assert st["tokens_per_second"] == pytest.approx(25.0)
+        assert st["truncated"] is False
+
+    def test_generator_gets_context_window_and_truncation_is_flagged(self, monkeypatch):
+        import src.core.llm_client as mod
+        from src.config import LLM_NUM_CTX
+        from src.core.llm_client import UnifiedLLMClient
+
+        sent = {}
+
+        def post(url, json=None, **_):
+            sent.update(json)
+            return SimpleNamespace(raise_for_status=lambda: None, json=lambda: {
+                "message": {"content": "cut off mid"}, "prompt_eval_count": 900,
+                "eval_count": 64, "done_reason": "length"})
+
+        monkeypatch.setattr(mod.requests, "post", post)
+        client = UnifiedLLMClient(model="llama3.1:8b-instruct-q8_0", provider="ollama",
+                                  max_tokens=64)
+        _, st = client.chat_with_stats([{"role": "user", "content": "hi"}])
+        assert sent["options"]["num_ctx"] == LLM_NUM_CTX
+        assert sent["options"]["num_predict"] == 64
+        assert st["finish_reason"] == "length" and st["truncated"] is True
+
+    def test_answer_budget_fits_the_800_word_instruction(self):
+        from src.config import LLM_MAX_TOKENS, LLM_NUM_CTX
+
+        assert LLM_MAX_TOKENS >= 1400            # ~800 words of clinical prose
+        assert LLM_NUM_CTX >= LLM_MAX_TOKENS + 1500  # + prompt with evidence
 
 
 # ---------------------------------------------------------------------------

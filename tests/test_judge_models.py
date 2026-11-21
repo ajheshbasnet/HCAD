@@ -137,10 +137,11 @@ def test_http_judge_payload_disables_thinking_and_sets_ctx():
     assert captured["format"] == "json"
     assert captured["options"]["num_ctx"] == cfg.JUDGE_NUM_CTX
 
-    gen = UnifiedLLMClient(provider="ollama")  # generator: no judge ctx, no think
+    gen = UnifiedLLMClient(provider="ollama")  # generator: its own ctx, no think
     with patch("src.core.llm_client.requests.post", fake_post):
         gen.chat([{"role": "user", "content": "x"}])
-    assert "think" not in captured and "num_ctx" not in captured["options"]
+    assert "think" not in captured
+    assert captured["options"]["num_ctx"] == cfg.LLM_NUM_CTX
 
 
 def test_check_ready_reports_missing_model():

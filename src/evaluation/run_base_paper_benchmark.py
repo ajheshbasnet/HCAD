@@ -1200,6 +1200,11 @@ def latency_breakdown(per_question: List[Dict[str, Any]], labels: List[str]) -> 
             "generated_tokens": mean_std(_vals("completion_tokens")),
             "tokens_per_second": mean_std(_vals("tokens_per_second")),
             "abstention_rate": (sum(1 for x in lat if x.get("abstained")) / len(lat)),
+            # answers cut off by LLM_MAX_TOKENS (None for pre-tracking records)
+            "truncated_answers": sum(1 for g in gen if g.get("truncated")),
+            "truncation_rate": (sum(1 for g in gen if g.get("truncated"))
+                                / sum(1 for g in gen if "truncated" in g)
+                                if any("truncated" in g for g in gen) else None),
         }
     return out
 

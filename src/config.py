@@ -415,7 +415,13 @@ LLM_MODEL_ALIASES = ("llama3.1:8b",)
 # Base-paper Fig. 3 parity: evaluate augmentation generality across generators.
 BENCHMARK_GENERATORS = [LLM_MODEL]  # e.g. ["llama3.1:8b", "qwen3:14b", "deepseek-r1:8b"]
 LLM_TEMPERATURE = 0.1
-LLM_MAX_TOKENS = 1024
+# Answer token cap. The shared synthesis prompt asks for 'under 800 words'
+# (~1,050-1,100 tokens), so 1024 cut compliant answers mid-sentence.
+LLM_MAX_TOKENS = int(os.getenv("LLM_MAX_TOKENS", "1536"))
+# Generator context window (ollama num_ctx). Prompt (~1.1-1.3k tokens with
+# the 350-word evidence block) + LLM_MAX_TOKENS must fit; Ollama's small
+# default context silently drops the start of the prompt.
+LLM_NUM_CTX = int(os.getenv("LLM_NUM_CTX", "4096"))
 ENABLE_FEW_SHOT = False  # zero-shot default; opt into few-shot explicitly
 FEW_SHOT_COUNT = 4  # consumed by PromptBuilder.build_mcq_prompt
 
