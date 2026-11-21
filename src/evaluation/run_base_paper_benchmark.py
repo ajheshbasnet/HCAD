@@ -361,17 +361,23 @@ def _hcad_config_id() -> str:
             f"@{dense_anchor_min():g}|group={int(group_kg_facts_enabled())}")
 
 
+#: Generator of checkpoint records written before the generator was recorded.
+_LEGACY_GENERATOR = "llama3.1:8b-instruct-q4_K_M"
+
+
 def _config_matches(record: Dict[str, Any],
                     required_judges: Optional[Sequence[str]]) -> bool:
-    """A record counts only for the judge panel AND HCAD config that made it.
+    """A record counts only for the judge, generator AND HCAD config that made it.
 
-    Switching JUDGE_MODEL_INDEX (or the HCAD evidence settings) and
-    re-running must NOT resume or aggregate another configuration's scores.
+    Switching JUDGE_MODEL_INDEX / JUDGE_QUANT, the generator precision
+    (LLM_QUANT) or the HCAD evidence settings and re-running must NOT resume
+    or aggregate another configuration's answers or scores.
     Inactive (always True) when ``required_judges`` is None.
     """
     if required_judges is None:
         return True
     return (list(record.get("judges") or []) == list(required_judges)
+            and record.get("generator", _LEGACY_GENERATOR) == LLM_MODEL
             and record.get("hcad_config_id") == _hcad_config_id())
 
 
@@ -1436,6 +1442,7 @@ def run_benchmark(num_samples: int = 10, output_path: Optional[Path] = None,
                 "question_set_id": question_set_id,
                 "arms": {a: ARM_LABELS[a] for a in arm_ids},
                 "judges": judge_names,
+                "generator": LLM_MODEL,
                 "hcad_config_id": hcad_config_id,
                 "grounded_mode": "grounded" if hcad_contexts else "parametric",
                 "n_hcad_contexts": len(hcad_contexts),
@@ -1505,12 +1512,12 @@ def run_benchmark(num_samples: int = 10, output_path: Optional[Path] = None,
             "num_samples": len(samples),
             "arms": {a: ARM_LABELS[a] for a in arm_ids},
             "ablation_env": {a: ABLATION_ENV[a] for a in arm_ids if a in ABLATION_ENV},
-            "generator": {"model": LLM_MODEL, "label": BASELINE_LABEL},
+            "generator": {"model": LLM_MODEL, "quant": LLM_MODEL.rsplit("-", 1)[-1],
+                          "label": BASELINE_LABEL},
             "judges": judge.manifest(),
             "judge_selection": {
                 "model_index": os.environ.get("JUDGE_MODEL_INDEX") or None,
                 "quant": os.environ.get("JUDGE_QUANT") or None,
-                "ensemble_env": os.environ.get("JUDGE_ENSEMBLE") or None,
             },
             "hcad_evidence_config": {
                 "config_id": hcad_config_id,

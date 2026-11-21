@@ -99,20 +99,21 @@ class TestConfig:
         assert canonical_system_label("Vanilla RAG") == ARM_LABELS["dense"]
         assert "Baseline LLM" not in ARM_LABELS.values()
 
-    def test_default_judge_ensemble(self, monkeypatch):
-        monkeypatch.delenv("JUDGE_ENSEMBLE", raising=False)
-        monkeypatch.delenv("JUDGE_ENABLE_API_JUDGE", raising=False)
-        monkeypatch.delenv("JUDGE_MODEL_INDEX", raising=False)
-        assert judge_ensemble_specs() == [("ollama", "gemma2:9b-instruct-q4_K_M")]
+    def test_default_judge(self, monkeypatch):
+        for k in ("JUDGE_ENSEMBLE", "JUDGE_ENABLE_API_JUDGE", "JUDGE_MODEL_INDEX",
+                  "JUDGE_OLLAMA_MODEL", "JUDGE_QUANT"):
+            monkeypatch.delenv(k, raising=False)
+        assert judge_ensemble_specs() == [("ollama", "gemma2:9b-instruct-q8_0")]
 
-    def test_optional_api_judge(self, monkeypatch):
+    def test_api_judge_option_removed(self, monkeypatch):
         monkeypatch.delenv("JUDGE_ENSEMBLE", raising=False)
         monkeypatch.setenv("JUDGE_ENABLE_API_JUDGE", "1")
-        assert judge_ensemble_specs()[-1] == ("nvidia", "meta/llama-3.3-70b-instruct")
+        with pytest.raises(ValueError, match="removed"):
+            judge_ensemble_specs()
 
-    def test_invalid_judge_spec(self, monkeypatch):
+    def test_ensemble_option_removed(self, monkeypatch):
         monkeypatch.setenv("JUDGE_ENSEMBLE", "gemma2")
-        with pytest.raises(ValueError):
+        with pytest.raises(ValueError, match="removed"):
             judge_ensemble_specs()
 
     def test_ablation_toggles(self, monkeypatch):
@@ -569,12 +570,13 @@ def test_cli_exposes_revision_commands():
 
 
 def test_resume_reruns_legacy_or_incompatible_records(tmp_path):
+    from src.config import LLM_MODEL
     from src.evaluation.run_base_paper_benchmark import (
         _completed_questions_from_checkpoint, _hcad_config_id)
 
     ckpt = tmp_path / "c.jsonl"
     base = {"question_pool": "test", "question_set_id": "s",
-            "hcad_config_id": _hcad_config_id()}
+            "hcad_config_id": _hcad_config_id(), "generator": LLM_MODEL}
     rows = [
         {**base, "question": "legacy"},                                   # schema 1
         {**base, "question": "ok", "schema": 2,
